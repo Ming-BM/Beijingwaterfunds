@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>管理后台 - 资金计划填报系统</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "微软雅黑", Arial, sans-serif; font-size: 13px; background: #f0f2f5; }
+.header { background: #1a3a6b; color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+.header h1 { font-size: 18px; }
+.header a { color: #a8c4e8; font-size: 13px; text-decoration: none; }
+.header a:hover { color: white; }
+.container { max-width: 1200px; margin: 20px auto; padding: 0 12px; }
+.export-bar { background: white; border-radius: 8px; padding: 16px 20px; margin-bottom: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.export-bar span { color: #555; font-weight: bold; }
+.btn-export { background: #1a3a6b; color: white; border: none; padding: 9px 24px;
+  border-radius: 5px; cursor: pointer; font-size: 13px; text-decoration: none; display: inline-block; }
+.btn-export:hover { background: #2451a3; }
+.btn-export.green { background: #27ae60; }
+.btn-export.green:hover { background: #1e8449; }
+.btn-export.orange { background: #e67e22; }
+.btn-export.orange:hover { background: #ca6f1e; }
+.card { background: white; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); overflow: hidden; margin-bottom: 16px; }
+.card-header { background: #1a3a6b; color: white; padding: 12px 16px; font-weight: bold;
+  display: flex; justify-content: space-between; align-items: center; }
+.card-header.clickable { cursor: pointer; user-select: none; }
+.card-header.clickable:hover { background: #2451a3; }
+.badge { background: #e74c3c; color: white; border-radius: 12px; padding: 2px 10px; font-size: 12px; }
+.toggle-icon { font-size: 12px; color: #a8c4e8; }
+table { width: 100%; border-collapse: collapse; }
+th { background: #f5f7fa; color: #555; padding: 10px 12px; text-align: left;
+  font-weight: bold; border-bottom: 2px solid #e0e0e0; }
+td { padding: 10px 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
+tr:hover td { background: #f8f9ff; }
+.empty { text-align: center; color: #aaa; padding: 40px; }
+.dept-tag { background: #e8f0fe; color: #1a3a6b; border-radius: 4px; padding: 2px 8px; font-size: 12px; }
+.time-tag { color: #999; font-size: 12px; }
+.btn-del { background: #e74c3c; color: white; border: none; border-radius: 4px;
+  padding: 4px 10px; cursor: pointer; font-size: 12px; }
+.btn-del:hover { background: #c0392b; }
+.stats { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.stat-card { background: white; border-radius: 8px; padding: 14px 20px; flex: 1; min-width: 160px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1); text-align: center; }
+.stat-card .num { font-size: 28px; font-weight: bold; color: #1a3a6b; }
+.stat-card .lbl { color: #888; font-size: 12px; margin-top: 4px; }
+
+/* Preview styles */
+.preview-body { padding: 16px; overflow-x: auto; }
+.prev-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px; }
+.prev-table th { background: #2E5EA8; color: white; padding: 7px 10px; text-align: center;
+  border: 1px solid #ccc; font-weight: bold; white-space: nowrap; }
+.prev-table td { padding: 6px 10px; border: 1px solid #ddd; vertical-align: middle; }
+.prev-table tr:hover td { background: #f0f4ff; }
+.row-grand-total td { background: #1a3a6b !important; color: white !important; font-weight: bold; }
+.row-grand-total:hover td { background: #1a3a6b !important; }
+.row-total td { background: #DCE6F1; font-weight: bold; }
+.row-total:hover td { background: #ccd8ee !important; }
+.row-subtotal td { background: #EAF0FB; font-weight: bold; }
+.row-excluded td { color: #aaa; font-style: italic; background: #f8f8f8; }
+.row-excluded:hover td { background: #f8f8f8 !important; }
+.sub-section { margin-bottom: 20px; }
+.sub-section-title { background: #1a3a6b; color: white; padding: 8px 12px; font-weight: bold;
+  font-size: 13px; margin-bottom: 0; border-radius: 4px 4px 0 0; }
+.sub-section .prev-table { margin-bottom: 0; }
+.loading-msg { color: #999; padding: 20px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>管理后台 · 资金计划填报系统</h1>
+  <div style="display:flex;gap:20px;align-items:center">
+    <a href="/">← 返回填报页面</a>
+    <a href="/logout" style="color:#f1948a;font-size:13px;text-decoration:none;">退出登录</a>
+  </div>
+</div>
+
+<div class="container">
+  <div class="stats">
+    <div class="stat-card">
+      <div class="num">{{ submissions|length }}</div>
+      <div class="lbl">总提交份数</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="deptCount">-</div>
+      <div class="lbl">提交部门数</div>
+    </div>
+  </div>
+
+  <div class="export-bar">
+    <span>导出汇总数据：</span>
+    <a class="btn-export" href="/export/main">⬇ 导出汇总主表 Excel</a>
+    <a class="btn-export green" href="/export/sub">⬇ 导出汇总附表 Excel</a>
+    <span style="color:#999;font-size:12px;">汇总主表：所有部门金额相加；汇总附表：所有明细条目累计，单一工作表</span>
+  </div>
+
+  <!-- 填报记录 -->
+  <div class="card">
+    <div class="card-header">
+      <span>填报记录</span>
+      <span class="badge">共 {{ submissions|length }} 条</span>
+    </div>
+    {% if submissions %}
+    <table>
+      <thead>
+        <tr>
+          <th>序号</th><th>填报人</th><th>所属部门</th><th>提交时间</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in submissions %}
+        <tr id="row_{{ s.id }}">
+          <td style="color:#aaa;">{{ loop.index }}</td>
+          <td><strong>{{ s.submitter_name }}</strong></td>
+          <td><span class="dept-tag">{{ s.department }}</span></td>
+          <td><span class="time-tag">{{ s.submit_time }}</span></td>
+          <td><button class="btn-del" onclick="delRow({{ s.id }}, this)">删除</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">暂无填报记录</div>
+    {% endif %}
+  </div>
+
+  <!-- 汇总主表预览 -->
+  <div class="card">
+    <div class="card-header clickable" onclick="togglePreview('main')">
+      <span>汇总主表预览</span>
+      <span class="toggle-icon" id="mainToggle">▶ 点击展开</span>
+    </div>
+    <div id="mainPreviewBody" style="display:none;">
+      <div class="preview-body">
+        <div id="mainPreviewContent"><div class="loading-msg">正在加载数据...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 汇总附表预览 -->
+  <div class="card" style="margin-bottom: 24px;">
+    <div class="card-header clickable" onclick="togglePreview('sub')">
+      <span>汇总附表预览</span>
+      <span class="toggle-icon" id="subToggle">▶ 点击展开</span>
+    </div>
+    <div id="subPreviewBody" style="display:none;">
+      <div class="preview-body">
+        <div id="subPreviewContent"><div class="loading-msg">正在加载数据...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const depts = new Set([{% for s in submissions %}'{{ s.department }}',{% endfor %}]);
+document.getElementById('deptCount').textContent = depts.size;
+
+function delRow(id, btn) {
+  if (!confirm('确认删除该条填报记录？此操作不可恢复。')) return;
+  fetch('/admin/delete/' + id, { method: 'POST' })
+    .then(r => r.json())
+    .then(res => { if (res.success) document.getElementById('row_' + id).remove(); });
+}
+
+let mainLoaded = false, subLoaded = false;
+
+function togglePreview(type) {
+  const body = document.getElementById(type + 'PreviewBody');
+  const toggle = document.getElementById(type + 'Toggle');
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  toggle.textContent = isOpen ? '▶ 点击展开' : '▼ 点击收起';
+  if (!isOpen) {
+    if (type === 'main' && !mainLoaded) { mainLoaded = true; loadMainPreview(); }
+    if (type === 'sub'  && !subLoaded)  { subLoaded  = true; loadSubPreview(); }
+  }
+}
+
+function fmtNum(v) {
+  const n = parseFloat(v);
+  if (isNaN(n) || n === 0) return '-';
+  return n.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function loadMainPreview() {
+  fetch('/api/preview/main')
+    .then(r => r.json())
+    .then(data => {
+      const vals = data.values;
+      let html = '<table class="prev-table"><thead><tr><th style="text-align:left;min-width:320px">计划项目</th><th style="min-width:160px">本月申报数（元）</th></tr></thead><tbody>';
+      for (const item of data.items) {
+        const indent = '　'.repeat(item.level);
+        const val = vals[item.id] || 0;
+        let rowCls = '';
+        if (item.isTotal) rowCls = 'row-grand-total';
+        else if (item.level === 0 && item.type === 'subtotal') rowCls = 'row-total';
+        else if (item.type === 'subtotal') rowCls = 'row-subtotal';
+        else if (item.type === 'excluded') rowCls = 'row-excluded';
+        const valStr = item.type === 'excluded' ? '（不计入）' : (item.type === 'input' || item.isTotal || item.type === 'subtotal' ? fmtNum(val) : '');
+        html += `<tr class="${rowCls}"><td>${indent}${item.label}</td><td style="text-align:right">${valStr}</td></tr>`;
+      }
+      html += '</tbody></table>';
+      document.getElementById('mainPreviewContent').innerHTML = html;
+    })
+    .catch(() => {
+      document.getElementById('mainPreviewContent').innerHTML = '<div class="loading-msg">加载失败，请刷新页面重试。</div>';
+    });
+}
+
+const SUB_ORDER = ['chem_agent','prod_test','mfg_xm','mfg_bj','mfg_fl','mfg_xzxl','oh_prod','oh_admin','capital','prev_year','other_funds'];
+
+function loadSubPreview() {
+  fetch('/api/preview/sub')
+    .then(r => r.json())
+    .then(data => {
+      let html = '';
+      for (const st of SUB_ORDER) {
+        const sec = data[st];
+        if (!sec) continue;
+        html += `<div class="sub-section"><div class="sub-section-title">${sec.label}</div>`;
+        html += '<table class="prev-table"><thead><tr><th>序号</th><th>填报人</th><th>所属部门</th>';
+        for (const [key, label] of sec.cols) {
+          if (key === 'amount') {
+            html += `<th style="text-align:right">${label}</th>`;
+            if (sec.has_approval) html += '<th style="text-align:right">审批金额(元)</th>';
+          } else {
+            html += `<th>${label}</th>`;
+          }
+        }
+        html += '</tr></thead><tbody>';
+
+        if (sec.items.length === 0) {
+          const totalCols = 3 + sec.cols.length + (sec.has_approval ? 1 : 0);
+          html += `<tr><td colspan="${totalCols}" style="text-align:center;color:#aaa;padding:12px;">暂无填报数据</td></tr>`;
+        } else {
+          sec.items.forEach((item, idx) => {
+            html += `<tr><td style="text-align:center">${idx+1}</td><td>${item.sub}</td><td>${item.dept}</td>`;
+            for (const [key, label] of sec.cols) {
+              const v = item.data[key] || '';
+              if (key === 'amount') {
+                const amt = parseFloat(v) || 0;
+                html += `<td style="text-align:right">${fmtNum(amt)}</td>`;
+                if (sec.has_approval) html += `<td style="text-align:right">${fmtNum(amt)}</td>`;
+              } else {
+                html += `<td>${v}</td>`;
+              }
+            }
+            html += '</tr>';
+          });
+        }
+
+        // Total row
+        html += '<tr class="row-total"><td><strong>合计</strong></td><td></td><td></td>';
+        for (const [key, label] of sec.cols) {
+          if (key === 'amount') {
+            html += `<td style="text-align:right"><strong>${fmtNum(sec.total)}</strong></td>`;
+            if (sec.has_approval) html += `<td style="text-align:right"><strong>${fmtNum(sec.total)}</strong></td>`;
+          } else if (key !== 'name') {
+            html += '<td></td>';
+          } else {
+            html += '<td></td>';
+          }
+        }
+        html += '</tr></tbody></table></div>';
+      }
+      document.getElementById('subPreviewContent').innerHTML = html;
+    })
+    .catch(() => {
+      document.getElementById('subPreviewContent').innerHTML = '<div class="loading-msg">加载失败，请刷新页面重试。</div>';
+    });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>资金计划填报系统</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "微软雅黑", Arial, sans-serif; font-size: 13px; background: #f0f2f5; }
+
+.page-header { background: #1a3a6b; color: white; padding: 16px 24px;
+  display: flex; justify-content: space-between; align-items: center; }
+.page-header-center { text-align: center; flex: 1; }
+.page-header h1 { font-size: 18px; }
+.page-header p { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+.btn-logout { color: #a8c4e8; font-size: 12px; text-decoration: none; white-space: nowrap; }
+.btn-logout:hover { color: white; }
+
+.form-info { background: white; margin: 12px auto; max-width: 1100px; padding: 14px 20px;
+  border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+.form-info label { font-weight: bold; color: #333; margin-right: 6px; }
+.form-info input { border: 1px solid #ccc; border-radius: 4px; padding: 6px 10px; font-size: 13px; width: 180px; }
+.form-info input:focus { outline: none; border-color: #1a3a6b; }
+.required { color: red; }
+.fill-time { color: #999; font-size: 12px; }
+
+.tabs { max-width: 1100px; margin: 0 auto 0; display: flex; gap: 2px; padding: 0 0 0 0; }
+.tab-btn { padding: 10px 28px; background: #d0d8e8; border: none; border-radius: 6px 6px 0 0;
+  cursor: pointer; font-size: 14px; font-family: inherit; color: #555; font-weight: bold; }
+.tab-btn.active { background: white; color: #1a3a6b; }
+
+.tab-content { display: none; max-width: 1100px; margin: 0 auto 20px; background: white;
+  border-radius: 0 6px 6px 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); overflow: hidden; }
+.tab-content.active { display: block; }
+
+table { width: 100%; border-collapse: collapse; }
+th { background: #1a3a6b; color: white; padding: 8px 10px; text-align: center; font-weight: normal; white-space: nowrap; }
+td { padding: 4px 8px; border-bottom: 1px solid #e8e8e8; vertical-align: middle; }
+
+.level0 { font-weight: bold; background: #dce6f1; }
+.level1 { padding-left: 14px !important; }
+.level2 { padding-left: 28px !important; }
+.level3 { padding-left: 44px !important; color: #444; }
+.level4 { padding-left: 60px !important; color: #555; }
+.subtotal { background: #eaf0fb; font-weight: bold; }
+.row-total { background: #1a3a6b !important; color: white; font-weight: bold; }
+.row-total td { border-bottom: none; }
+.excluded { background: #f5f5f5; color: #bbb; }
+
+.amount-input { width: 100%; text-align: right; border: 1px solid #d0d0d0; border-radius: 3px;
+  padding: 3px 6px; font-size: 12px; background: #fffef0; }
+.amount-input:focus { outline: none; border-color: #1a3a6b; background: white; }
+.amount-input.from-sub { background: #e8f4ff; color: #1a3a6b; font-weight: bold; cursor: default; }
+.amount-input.auto { background: transparent; border: none; font-weight: bold; color: inherit; cursor: default; }
+.remark-input { width: 100%; border: 1px solid #d0d0d0; border-radius: 3px; padding: 3px 6px; font-size: 12px; }
+
+/* 附表样式 */
+.sub-section { border-bottom: 2px solid #e0e8f0; }
+.sub-header { background: #2451a3; color: white; padding: 10px 16px; cursor: pointer;
+  display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
+.sub-header:hover { background: #1a3a6b; }
+.sub-body { padding: 12px; display: none; }
+.sub-body.open { display: block; }
+.sub-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+.sub-table th { background: #4a7cc7; color: white; padding: 6px 8px; font-size: 12px; }
+.sub-table td { border: 1px solid #ddd; padding: 4px; }
+.sub-input { width: 100%; border: 1px solid #ccc; border-radius: 3px; padding: 4px 6px; font-size: 12px; }
+.sub-input.amt { text-align: right; }
+.btn-add { background: #2451a3; color: white; border: none; border-radius: 4px;
+  padding: 5px 14px; cursor: pointer; font-size: 12px; margin-top: 4px; }
+.btn-add:hover { background: #1a3a6b; }
+.btn-del { background: #e74c3c; color: white; border: none; border-radius: 3px;
+  padding: 3px 8px; cursor: pointer; font-size: 11px; }
+.sub-total-hint { color: #2451a3; font-size: 12px; margin-top: 4px; font-weight: bold; }
+
+.btn-area { max-width: 1100px; margin: 0 auto 32px; text-align: center; padding: 12px; }
+.btn-submit { background: #1a3a6b; color: white; border: none; padding: 12px 60px;
+  font-size: 15px; border-radius: 5px; cursor: pointer; margin-right: 12px; }
+.btn-submit:hover { background: #2451a3; }
+.btn-reset { background: white; color: #666; border: 1px solid #ccc;
+  padding: 12px 32px; font-size: 15px; border-radius: 5px; cursor: pointer; }
+
+.hint { max-width: 1100px; margin: 4px auto 8px; color: #888; font-size: 12px; padding: 0 4px; }
+.toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  background: #333; color: white; padding: 10px 24px; border-radius: 6px;
+  font-size: 14px; display: none; z-index: 9999; }
+.toast.show { display: block; }
+.toast.success { background: #27ae60; }
+.toast.error { background: #e74c3c; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div style="width:80px"></div>
+  <div class="page-header-center">
+    <h1>2026年7月资金计划填报系统</h1>
+    <p>排水集团所属单位 · 本月申报数填报</p>
+  </div>
+  <a href="/logout" class="btn-logout">退出登录</a>
+</div>
+
+<div class="form-info">
+  <div><label>填报人姓名 <span class="required">*</span></label>
+    <input type="text" id="reporterName" placeholder="请输入姓名" required></div>
+  <div><label>所属部门 <span class="required">*</span></label>
+    <input type="text" id="department" placeholder="请输入部门/单位名称" required></div>
+  <div class="fill-time">填写时间：<span id="fillTime"></span></div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('main')">主 表</button>
+  <button class="tab-btn" onclick="switchTab('sub')">附 表（明细项目）</button>
+</div>
+
+<div id="tab-main" class="tab-content active">
+  <div style="padding:6px 12px; background:#fff8e1; font-size:12px; color:#888; border-bottom:1px solid #eee;">
+    🔵 蓝色行由附表自动计算，请勿手动修改 &nbsp;|&nbsp; ⬜ 白色/浅色行请手动填写
+  </div>
+  <table id="mainTable">
+    <thead><tr>
+      <th style="text-align:left;padding-left:10px;width:420px;">计划项目</th>
+      <th style="width:160px;">本月申报数（元）</th>
+      <th style="width:150px;">备注</th>
+    </tr></thead>
+    <tbody id="mainTbody"></tbody>
+  </table>
+</div>
+
+<div id="tab-sub" class="tab-content">
+  <div id="subSections"></div>
+</div>
+
+<div class="btn-area">
+  <button class="btn-submit" onclick="submitForm()">提 交 填 报</button>
+  <button class="btn-reset" onclick="resetForm()">重 置</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let ITEMS = [];
+let SUB_TYPES = {};
+const subValues = {}; // subType -> total amount
+
+// ===== 初始化 =====
+async function init() {
+  document.getElementById('fillTime').textContent = new Date().toLocaleString('zh-CN');
+  const [itemsRes, subRes] = await Promise.all([
+    fetch('/api/items').then(r => r.json()),
+    fetch('/api/subtypes').then(r => r.json())
+  ]);
+  ITEMS = itemsRes;
+  SUB_TYPES = subRes;
+  Object.keys(SUB_TYPES).forEach(k => subValues[k] = 0);
+  renderMainTable();
+  renderSubTables();
+}
+
+// ===== 主表渲染 =====
+function renderMainTable() {
+  const tbody = document.getElementById('mainTbody');
+  ITEMS.forEach(item => {
+    const tr = document.createElement('tr');
+    let cls = `level${item.level}`;
+    if (item.isTotal) cls = 'row-total';
+    else if (item.type === 'excluded') cls = 'excluded';
+    else if (item.type === 'subtotal') cls += ' subtotal';
+    tr.className = cls;
+
+    // 科目名
+    const tdL = document.createElement('td');
+    tdL.className = `level${item.level}`;
+    tdL.textContent = item.label;
+    if (item.type === 'excluded') {
+      const s = document.createElement('span');
+      s.style = 'font-size:11px;color:#ccc;margin-left:6px;';
+      s.textContent = '（不计入资金计划）';
+      tdL.appendChild(s);
+    }
+    tr.appendChild(tdL);
+
+    // 金额
+    const tdA = document.createElement('td');
+    tdA.style.textAlign = 'right';
+    if (item.type !== 'excluded') {
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.id = 'v_' + item.id;
+      inp.className = 'amount-input';
+      if (item.subType) {
+        inp.className += ' from-sub';
+        inp.readOnly = true;
+        inp.title = '由附表自动计算';
+        inp.placeholder = '附表自动';
+      } else if (item.type === 'subtotal' || item.isTotal) {
+        inp.className += ' auto';
+        inp.readOnly = true;
+        inp.placeholder = '自动计算';
+      } else {
+        inp.placeholder = '请输入金额';
+        inp.addEventListener('input', recalcAll);
+      }
+      tdA.appendChild(inp);
+    }
+    tr.appendChild(tdA);
+
+    // 备注
+    const tdR = document.createElement('td');
+    if (item.type === 'input') {
+      const ri = document.createElement('input');
+      ri.type = 'text';
+      ri.className = 'remark-input';
+      ri.id = 'r_' + item.id;
+      ri.placeholder = '备注（选填）';
+      tdR.appendChild(ri);
+    }
+    tr.appendChild(tdR);
+    tbody.appendChild(tr);
+  });
+}
+
+// ===== 附表渲染 =====
+function renderSubTables() {
+  const container = document.getElementById('subSections');
+  Object.entries(SUB_TYPES).forEach(([key, info]) => {
+    const section = document.createElement('div');
+    section.className = 'sub-section';
+
+    const header = document.createElement('div');
+    header.className = 'sub-header';
+    header.innerHTML = `<span>${info.label}</span><span>▼</span>`;
+    header.onclick = () => {
+      body.classList.toggle('open');
+      header.querySelector('span:last-child').textContent =
+        body.classList.contains('open') ? '▲' : '▼';
+    };
+
+    const body = document.createElement('div');
+    body.className = 'sub-body';
+    body.id = 'sub_body_' + key;
+
+    const cols = info.cols;
+    const tableEl = document.createElement('table');
+    tableEl.className = 'sub-table';
+    tableEl.id = 'sub_table_' + key;
+
+    const thead = tableEl.createTHead();
+    const hr = thead.insertRow();
+    ['序号', ...cols.map(c => c[1]), '操作'].forEach(h => {
+      const th = document.createElement('th');
+      th.textContent = h;
+      hr.appendChild(th);
+    });
+
+    const tbody2 = tableEl.createTBody();
+    tbody2.id = 'sub_tbody_' + key;
+
+    body.appendChild(tableEl);
+
+    const hint = document.createElement('div');
+    hint.className = 'sub-total-hint';
+    hint.id = 'sub_hint_' + key;
+    hint.textContent = '合计需求金额：0.00 元';
+    body.appendChild(hint);
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-add';
+    addBtn.textContent = '+ 添加一行';
+    addBtn.onclick = () => addSubRow(key, cols);
+    body.appendChild(addBtn);
+
+    section.appendChild(header);
+    section.appendChild(body);
+    container.appendChild(section);
+
+    // 默认加一行空行
+    addSubRow(key, cols);
+  });
+}
+
+let rowCounters = {};
+function addSubRow(key, cols) {
+  if (!rowCounters[key]) rowCounters[key] = 0;
+  rowCounters[key]++;
+  const idx = rowCounters[key];
+
+  const tbody2 = document.getElementById('sub_tbody_' + key);
+  const tr = tbody2.insertRow();
+  tr.id = `subrow_${key}_${idx}`;
+
+  // 序号
+  const tdIdx = tr.insertCell();
+  tdIdx.textContent = tbody2.rows.length;
+  tdIdx.style.textAlign = 'center';
+  tdIdx.style.color = '#888';
+
+  // 各字段
+  cols.forEach(([colKey, colLabel]) => {
+    const td = tr.insertCell();
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'sub-input' + (colKey === 'amount' ? ' amt' : '');
+    inp.placeholder = colLabel;
+    inp.dataset.key = colKey;
+    if (colKey === 'amount') {
+      inp.addEventListener('input', () => updateSubTotal(key));
+    }
+    td.appendChild(inp);
+  });
+
+  // 删除按钮
+  const tdDel = tr.insertCell();
+  const btn = document.createElement('button');
+  btn.className = 'btn-del';
+  btn.textContent = '删除';
+  btn.onclick = () => {
+    tr.remove();
+    updateSubTotal(key);
+    // 重新编号
+    const rows = document.getElementById('sub_tbody_' + key).rows;
+    for (let i = 0; i < rows.length; i++) rows[i].cells[0].textContent = i + 1;
+  };
+  tdDel.appendChild(btn);
+}
+
+function updateSubTotal(key) {
+  const tbody2 = document.getElementById('sub_tbody_' + key);
+  let total = 0;
+  for (const row of tbody2.rows) {
+    for (const cell of row.cells) {
+      const inp = cell.querySelector('input[data-key="amount"]');
+      if (inp) total += parseFloat(inp.value.replace(/,/g, '') || 0) || 0;
+    }
+  }
+  subValues[key] = total;
+  document.getElementById('sub_hint_' + key).textContent =
+    `合计需求金额：${total.toLocaleString('zh-CN', {minimumFractionDigits:2})} 元`;
+
+  // 更新主表对应字段
+  const mainField = SUB_TYPES[key].main_field;
+  const el = document.getElementById('v_' + mainField);
+  if (el) {
+    el.value = total > 0 ? total.toLocaleString('zh-CN', {minimumFractionDigits:2}) : '';
+    el.dataset.numval = total;
+    recalcAll();
+  }
+}
+
+// ===== 主表自动计算 =====
+function getVal(id) {
+  const el = document.getElementById('v_' + id);
+  if (!el) return 0;
+  if (el.dataset.numval !== undefined) return parseFloat(el.dataset.numval) || 0;
+  return parseFloat((el.value || '').replace(/,/g, '')) || 0;
+}
+
+function setVal(id, v) {
+  const el = document.getElementById('v_' + id);
+  if (!el) return;
+  el.dataset.numval = v;
+  el.value = v > 0 ? v.toLocaleString('zh-CN', {minimumFractionDigits:2}) : '';
+}
+
+function calcItem(item) {
+  if (item.type === 'subtotal' || item.isTotal) {
+    const sum = (item.children || []).reduce((s, cid) => {
+      const child = ITEMS.find(i => i.id === cid);
+      if (child) calcItem(child);
+      return s + getVal(cid);
+    }, 0);
+    setVal(item.id, sum);
+  }
+}
+
+function recalcAll() {
+  ITEMS.filter(i => i.type === 'subtotal' || i.isTotal).forEach(calcItem);
+}
+
+// ===== Tab 切换 =====
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0 && tab === 'main') || (i === 1 && tab === 'sub'));
+  });
+  document.getElementById('tab-main').classList.toggle('active', tab === 'main');
+  document.getElementById('tab-sub').classList.toggle('active', tab === 'sub');
+}
+
+// ===== 提交 =====
+function submitForm() {
+  const name = document.getElementById('reporterName').value.trim();
+  const dept = document.getElementById('department').value.trim();
+  if (!name) { showToast('请填写填报人姓名！', 'error'); return; }
+  if (!dept) { showToast('请填写所属部门！', 'error'); return; }
+
+  // 收集主表手动填写字段（排除 subType 和 subtotal 字段）
+  const main_fields = {};
+  ITEMS.forEach(item => {
+    if (item.type === 'input' && !item.subType) {
+      const v = getVal(item.id);
+      if (v) main_fields[item.id] = v;
+    }
+  });
+
+  // 收集附表数据
+  const sub_items = [];
+  Object.entries(SUB_TYPES).forEach(([key, info]) => {
+    const tbody2 = document.getElementById('sub_tbody_' + key);
+    for (const row of tbody2.rows) {
+      const d = {};
+      let hasData = false;
+      for (const cell of row.cells) {
+        const inp = cell.querySelector('input[data-key]');
+        if (inp && inp.value.trim()) {
+          d[inp.dataset.key] = inp.value.trim();
+          if (inp.dataset.key === 'amount' && parseFloat(inp.value) > 0) hasData = true;
+          if (inp.dataset.key !== 'amount' && inp.value.trim()) hasData = true;
+        }
+      }
+      if (hasData && d.name) sub_items.push({ type: key, data: d });
+    }
+  });
+
+  fetch('/submit', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ submitter_name: name, department: dept, main_fields, sub_items })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      showToast('提交成功！感谢填报。', 'success');
+      setTimeout(() => { if (confirm('提交成功！是否清空表单以供再次填写？')) resetForm(); }, 800);
+    } else {
+      showToast(res.msg || '提交失败', 'error');
+    }
+  })
+  .catch(() => showToast('网络错误，请重试', 'error'));
+}
+
+function resetForm() {
+  document.getElementById('reporterName').value = '';
+  document.getElementById('department').value = '';
+  document.querySelectorAll('.amount-input:not([readonly])').forEach(el => { el.value = ''; el.dataset.numval = ''; });
+  document.querySelectorAll('.remark-input').forEach(el => el.value = '');
+  // 清空附表
+  Object.keys(SUB_TYPES).forEach(key => {
+    const tbody2 = document.getElementById('sub_tbody_' + key);
+    while (tbody2.rows.length > 0) tbody2.deleteRow(0);
+    rowCounters[key] = 0;
+    subValues[key] = 0;
+    addSubRow(key, SUB_TYPES[key].cols);
+    document.getElementById('sub_hint_' + key).textContent = '合计需求金额：0.00 元';
+    const mf = SUB_TYPES[key].main_field;
+    const el = document.getElementById('v_' + mf);
+    if (el) { el.value = ''; el.dataset.numval = 0; }
+  });
+  recalcAll();
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (type || '');
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+init();
+</script>
+</body>
+</html>

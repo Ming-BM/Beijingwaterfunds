@@ -714,8 +714,9 @@ def api_preview_sub():
     conn.close()
     return jsonify(result)
 
+init_db()
+
 if __name__ == '__main__':
-    init_db()
     print('服务已启动：http://localhost:5000')
     print('管理页面：http://localhost:5000/admin')
     app.run(host='0.0.0.0', port=5000, debug=False)

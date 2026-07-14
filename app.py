@@ -1,6 +1,11 @@
 from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for
 from functools import wraps
-import psycopg2, psycopg2.extras, json, io, os
+import json, io, os
+try:
+    import psycopg2, psycopg2.extras
+    HAS_PG = True
+except ImportError:
+    HAS_PG = False
 from datetime import datetime
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -249,38 +254,83 @@ ITEMS = [
 ]
 
 # ===================== 数据库 =====================
+class DBHelper:
+    """统一封装 PostgreSQL 和 SQLite，本地无 DATABASE_URL 时自动用 SQLite"""
+    def __init__(self):
+        url = os.environ.get('DATABASE_URL')
+        if url and HAS_PG:
+            self._conn = psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
+            self._pg = True
+        else:
+            import sqlite3
+            self._conn = sqlite3.connect('budget.db')
+            self._conn.row_factory = sqlite3.Row
+            self._pg = False
+
+    def _q(self, sql):
+        return sql if self._pg else sql.replace('%s', '?')
+
+    def fetchall(self, sql, params=()):
+        cur = self._conn.cursor()
+        cur.execute(self._q(sql), params)
+        return cur.fetchall()
+
+    def execute(self, sql, params=()):
+        cur = self._conn.cursor()
+        cur.execute(self._q(sql), params)
+        return cur
+
+    def insert(self, sql, params=()):
+        if self._pg:
+            cur = self._conn.cursor()
+            cur.execute(sql + ' RETURNING id', params)
+            return cur.fetchone()['id']
+        else:
+            cur = self._conn.cursor()
+            cur.execute(self._q(sql), params)
+            return cur.lastrowid
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
 def get_db():
-    conn = psycopg2.connect(
-        os.environ['DATABASE_URL'],
-        cursor_factory=psycopg2.extras.RealDictCursor
-    )
-    return conn
+    return DBHelper()
 
 def init_db():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS submissions (
-            id SERIAL PRIMARY KEY,
-            submitter_name TEXT NOT NULL,
-            department TEXT NOT NULL,
-            submit_time TEXT NOT NULL,
-            main_fields TEXT NOT NULL
-        )
-    ''')
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS sub_items (
-            id SERIAL PRIMARY KEY,
-            submission_id INTEGER NOT NULL,
-            submitter_name TEXT NOT NULL,
-            department TEXT NOT NULL,
-            submit_time TEXT NOT NULL,
-            sub_type TEXT NOT NULL,
-            item_data TEXT NOT NULL
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    db = get_db()
+    if db._pg:
+        db.execute('''CREATE TABLE IF NOT EXISTS submissions (
+            id SERIAL PRIMARY KEY, submitter_name TEXT NOT NULL,
+            department TEXT NOT NULL, submit_time TEXT NOT NULL, main_fields TEXT NOT NULL
+        )''')
+        db.execute('''CREATE TABLE IF NOT EXISTS sub_items (
+            id SERIAL PRIMARY KEY, submission_id INTEGER NOT NULL,
+            submitter_name TEXT NOT NULL, department TEXT NOT NULL,
+            submit_time TEXT NOT NULL, sub_type TEXT NOT NULL, item_data TEXT NOT NULL
+        )''')
+        db.commit()
+        db.close()
+    else:
+        import sqlite3
+        conn = sqlite3.connect('budget.db')
+        conn.executescript('''
+            CREATE TABLE IF NOT EXISTS submissions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                submitter_name TEXT NOT NULL, department TEXT NOT NULL,
+                submit_time TEXT NOT NULL, main_fields TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS sub_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                submission_id INTEGER NOT NULL, submitter_name TEXT NOT NULL,
+                department TEXT NOT NULL, submit_time TEXT NOT NULL,
+                sub_type TEXT NOT NULL, item_data TEXT NOT NULL
+            );
+        ''')
+        conn.commit()
+        conn.close()
 
 # ===================== 路由 =====================
 @app.route('/login', methods=['GET', 'POST'])
@@ -332,14 +382,12 @@ def submit():
     sub_items_data = data.get('sub_items', [])
 
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        'INSERT INTO submissions (submitter_name,department,submit_time,main_fields) VALUES (%s,%s,%s,%s) RETURNING id',
+    sid = conn.insert(
+        'INSERT INTO submissions (submitter_name,department,submit_time,main_fields) VALUES (%s,%s,%s,%s)',
         (name, dept, now, json.dumps(main_fields, ensure_ascii=False))
     )
-    sid = cur.fetchone()['id']
     for item in sub_items_data:
-        cur.execute(
+        conn.execute(
             'INSERT INTO sub_items (submission_id,submitter_name,department,submit_time,sub_type,item_data) VALUES (%s,%s,%s,%s,%s,%s)',
             (sid, name, dept, now, item['type'], json.dumps(item['data'], ensure_ascii=False))
         )
@@ -351,9 +399,7 @@ def submit():
 @login_required(role='admin')
 def admin():
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute('SELECT id,submitter_name,department,submit_time FROM submissions ORDER BY submit_time DESC')
-    rows = cur.fetchall()
+    rows = conn.fetchall('SELECT id,submitter_name,department,submit_time FROM submissions ORDER BY submit_time DESC')
     conn.close()
     return render_template('admin.html', submissions=rows)
 
@@ -361,9 +407,8 @@ def admin():
 @login_required(role='admin')
 def delete_submission(sid):
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute('DELETE FROM sub_items WHERE submission_id=%s', (sid,))
-    cur.execute('DELETE FROM submissions WHERE id=%s', (sid,))
+    conn.execute('DELETE FROM sub_items WHERE submission_id=%s', (sid,))
+    conn.execute('DELETE FROM submissions WHERE id=%s', (sid,))
     conn.commit()
     conn.close()
     return jsonify({'success': True})
@@ -400,17 +445,13 @@ def compute_items(agg):
 @login_required(role='admin')
 def export_main():
     conn = get_db()
-    cur = conn.cursor()
-    # 汇总主表手动填写字段
     agg = {}
-    cur.execute('SELECT main_fields FROM submissions')
-    for row in cur.fetchall():
+    for row in conn.fetchall('SELECT main_fields FROM submissions'):
         for k, v in json.loads(row['main_fields']).items():
             agg[k] = agg.get(k, 0) + to_float(v)
-    # 汇总附表金额 → 填入对应主表字段
     for st, info in SUB_TYPES.items():
-        cur.execute('SELECT item_data FROM sub_items WHERE sub_type=%s', (st,))
-        total = sum(to_float(json.loads(r['item_data']).get('amount', 0)) for r in cur.fetchall())
+        total = sum(to_float(json.loads(r['item_data']).get('amount', 0))
+                    for r in conn.fetchall('SELECT item_data FROM sub_items WHERE sub_type=%s', (st,)))
         agg[info['main_field']] = total
     conn.close()
 
@@ -541,14 +582,12 @@ def export_sub():
     ws.row_dimensions[2].height = 18
 
     cur_row = 3
-    cur = conn.cursor()
 
     for st, info in SUB_TYPES.items():
-        cur.execute(
+        rows = conn.fetchall(
             'SELECT submitter_name,department,item_data FROM sub_items WHERE sub_type=%s ORDER BY id',
             (st,)
         )
-        rows = cur.fetchall()
 
         sc = SC[st]
         ncols = len(sc['h'])
@@ -634,15 +673,13 @@ def export_sub():
 @login_required(role='admin')
 def api_preview_main():
     conn = get_db()
-    cur = conn.cursor()
     agg = {}
-    cur.execute('SELECT main_fields FROM submissions')
-    for row in cur.fetchall():
+    for row in conn.fetchall('SELECT main_fields FROM submissions'):
         for k, v in json.loads(row['main_fields']).items():
             agg[k] = agg.get(k, 0) + to_float(v)
     for st, info in SUB_TYPES.items():
-        cur.execute('SELECT item_data FROM sub_items WHERE sub_type=%s', (st,))
-        total = sum(to_float(json.loads(r['item_data']).get('amount', 0)) for r in cur.fetchall())
+        total = sum(to_float(json.loads(r['item_data']).get('amount', 0))
+                    for r in conn.fetchall('SELECT item_data FROM sub_items WHERE sub_type=%s', (st,)))
         agg[info['main_field']] = total
     conn.close()
     computed = compute_items(agg)
@@ -655,14 +692,12 @@ APPROVAL_TYPES = {'mfg_xm','mfg_bj','mfg_fl','mfg_xzxl','oh_prod','oh_admin','ca
 @login_required(role='admin')
 def api_preview_sub():
     conn = get_db()
-    cur = conn.cursor()
     result = {}
     for st, info in SUB_TYPES.items():
-        cur.execute(
+        rows = conn.fetchall(
             'SELECT submitter_name,department,item_data FROM sub_items WHERE sub_type=%s ORDER BY id',
             (st,)
         )
-        rows = cur.fetchall()
         items = []
         total = 0.0
         for r in rows:

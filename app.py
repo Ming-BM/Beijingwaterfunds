@@ -16,8 +16,8 @@ app.secret_key = os.environ.get('SECRET_KEY', 'budget-app-secret-2026')
 
 # ===================== 账号配置（改密码后重启生效） =====================
 ACCOUNTS = {
-    'reporter': {'password': 'fill2026',  'role': 'user'},   # 填报账号
-    'admin':    {'password': 'admin2026', 'role': 'admin'},  # 管理员账号
+    'user': {'password': '123123',  'role': 'user'},   # 填报账号
+    'weixin':    {'password': '123123', 'role': 'admin'},  # 管理员账号
 }
 
 def login_required(role=None):

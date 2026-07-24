@@ -7,8 +7,13 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: "微软雅黑", Arial, sans-serif; background: #f0f2f5;
   display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-.login-box { background: white; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+.login-box { position: relative; background: white; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.12);
   padding: 40px 44px; width: 360px; }
+.lang-toggle { position: absolute; top: 16px; right: 16px; display: flex; border: 1px solid #ddd;
+  border-radius: 5px; overflow: hidden; font-size: 12px; }
+.lang-toggle button { border: none; background: white; color: #555; padding: 5px 10px; cursor: pointer;
+  font-family: inherit; }
+.lang-toggle button.active { background: #1a3a6b; color: white; }
 .logo { text-align: center; margin-bottom: 28px; }
 .logo h1 { font-size: 20px; color: #1a3a6b; font-weight: bold; margin-top: 8px; }
 .logo p { font-size: 12px; color: #999; margin-top: 4px; }
@@ -25,20 +30,41 @@ input:focus { border-color: #1a3a6b; box-shadow: 0 0 0 2px rgba(26,58,107,0.12);
 </head>
 <body>
 <div class="login-box">
+  <div class="lang-toggle">
+    <button type="button" id="btn-zh" class="active" onclick="setLang('zh')">中文</button>
+    <button type="button" id="btn-en" onclick="setLang('en')">EN</button>
+  </div>
   <div class="logo">
-    <h1>资金计划填报系统</h1>
-    <p>请使用分配的账号登录</p>
+    <h1 data-zh="资金计划填报系统" data-en="Capital Plan Declaration System">资金计划填报系统</h1>
+    <p data-zh="请使用分配的账号登录" data-en="Please sign in with your assigned account">请使用分配的账号登录</p>
   </div>
   <form method="post">
-    <label>用户名</label>
-    <input type="text" name="username" placeholder="请输入用户名" autofocus autocomplete="username">
-    <label>密码</label>
-    <input type="password" name="password" placeholder="请输入密码" autocomplete="current-password">
+    <label data-zh="用户名" data-en="Username">用户名</label>
+    <input type="text" name="username" placeholder="请输入用户名" data-ph-zh="请输入用户名" data-ph-en="Enter your username"
+      autofocus autocomplete="username">
+    <label data-zh="密码" data-en="Password">密码</label>
+    <input type="password" name="password" placeholder="请输入密码" data-ph-zh="请输入密码" data-ph-en="Enter your password"
+      autocomplete="current-password">
     {% if error %}
-    <div class="error">{{ error }}</div>
+    <div class="error" data-zh="{{ error }}" data-en="Incorrect username or password">{{ error }}</div>
     {% endif %}
-    <button type="submit" class="btn-login">登 录</button>
+    <button type="submit" class="btn-login" data-zh="登 录" data-en="Log In">登 录</button>
   </form>
 </div>
+<script>
+function setLang(lang) {
+  document.querySelectorAll('[data-' + lang + ']').forEach(function (el) {
+    el.textContent = el.getAttribute('data-' + lang);
+  });
+  document.querySelectorAll('[data-ph-' + lang + ']').forEach(function (el) {
+    el.placeholder = el.getAttribute('data-ph-' + lang);
+  });
+  document.getElementById('btn-zh').classList.toggle('active', lang === 'zh');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  localStorage.setItem('loginLang', lang);
+}
+setLang(localStorage.getItem('loginLang') || 'zh');
+</script>
 </body>
 </html>

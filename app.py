@@ -18,6 +18,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'budget-app-secret-2026')
 ACCOUNTS = {
     'user': {'password': '123123',  'role': 'user'},   # 填报账号
     'weixin':    {'password': '123123', 'role': 'admin'},  # 管理员账号
+    'demo':  {'password': 'demo2026', 'role': 'user'},  # 作品集访客演示账号，提交不落库
 }
 
 def login_required(role=None):
@@ -376,6 +377,10 @@ def submit():
     dept = data.get('department', '').strip()
     if not name or not dept:
         return jsonify({'success': False, 'msg': '姓名和部门不能为空'}), 400
+
+    if session.get('username') == 'demo':
+        # 演示账号：不写入数据库
+        return jsonify({'success': True})
 
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     main_fields = data.get('main_fields', {})
